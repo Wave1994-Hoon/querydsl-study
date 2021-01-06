@@ -1,5 +1,6 @@
 package study.querydsl;
 
+import com.querydsl.core.QueryResults;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +14,10 @@ import study.querydsl.entity.Team;
 
 import javax.persistence.EntityManager;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.*;
+import static study.querydsl.entity.QMember.*;
 
 // 전체 화면 날리기 command + shift + F12
 
@@ -69,5 +73,53 @@ public class QuerydslBasicTest {
             .fetchOne();
 
         assertThat(findMember.getUsername()).isEqualTo("member1");
+    }
+
+    @Test
+    public void search() {
+        Member findMember = queryFactory
+            .select(member)
+            .where(
+                member.username.eq("member1")
+                    .and(member.age.eq(10))
+            )
+            .fetchOne();
+        assertThat(findMember.getUsername()).isEqualTo("member1");
+    }
+
+    @Test
+    public void searchAndParam() {
+        Member findMember = queryFactory
+            .select(member)
+            .where(
+                member.username.eq("member1"),
+                null, // null은 무시하기 때문에 동적쿼리 사용할 때 유용함
+                (member.age.eq(10))
+            )
+            .fetchOne();
+        assertThat(findMember.getUsername()).isEqualTo("member1");
+    }
+
+    @Test
+    public void resultFetch() {
+        List<Member> fetch = queryFactory
+            .selectFrom(member)
+            .fetch();
+
+        Member fetchOne = queryFactory
+            .selectFrom(member)
+            .fetchOne();
+
+        Member fetchFirst = queryFactory
+            .selectFrom(member)
+            .fetchFirst();
+
+        QueryResults<Member> results = queryFactory
+            .selectFrom(member)
+            .fetchResults();
+
+        results.getTotal();
+        /* getResult를 사용해야 확인 가능 */
+        List<Member> content = results.getResults();
     }
 }
