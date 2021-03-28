@@ -15,6 +15,8 @@ import study.querydsl.entity.QTeam;
 import study.querydsl.entity.Team;
 
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.PersistenceUnit;
 
 import java.util.List;
 
@@ -265,7 +267,7 @@ public class QuerydslBasicTest {
     }
 
     /**
-     * 하이버네이트 5.1 부터 `on` 을 사용해서 서로 관계가 없는 필드로 외부 조인 가능
+     * 하이버네이트 5.1 부터 `on` 을 사용해서 서로 관계가 없는 필드로 외부 조인 가
      */
     @Test
     public void joinOnWithoutRelation() {
@@ -282,5 +284,32 @@ public class QuerydslBasicTest {
             .on(member.username.eq(team.name))
             .where(member.username.eq(team.name))
             .fetch();
+    }
+
+    @PersistenceUnit
+    EntityManagerFactory emf;
+
+    @Test
+    public void fetchJoinNo() {
+        em.flush();
+        em.clear();
+
+        Member findMemberWithoutFetchJoin = queryFactory
+            .selectFrom(QMember.member)
+            .where(QMember.member.username.eq("member1"))
+            .fetchOne();
+
+        boolean loaded = emf.getPersistenceUnitUtil().isLoaded(findMemberWithoutFetchJoin.getTeam());
+        assertThat(loaded).as("페치 조인 미적용").isFalse();
+
+        Member findMemberWithFetchJoin = queryFactory
+            .selectFrom(QMember.member)
+            .join(member.team, team).fetchJoin()
+            .where(QMember.member.username.eq("member1"))
+            .fetchOne();
+
+        boolean loadedWithFetchJoin = emf.getPersistenceUnitUtil().isLoaded(findMemberWithFetchJoin.getTeam());
+        assertThat(loadedWithFetchJoin).as("페치 조인 적용").isTrue();
+
     }
 }
