@@ -2,6 +2,7 @@ package study.querydsl;
 
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -310,6 +311,95 @@ public class QuerydslBasicTest {
 
         boolean loadedWithFetchJoin = emf.getPersistenceUnitUtil().isLoaded(findMemberWithFetchJoin.getTeam());
         assertThat(loadedWithFetchJoin).as("페치 조인 적용").isTrue();
-
     }
+
+    /*
+    * 나이가 가장 많은 회원 조회
+    * */
+    @Test
+    public void subQuery() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Member> result = queryFactory
+            .selectFrom(member)
+            .where(member.age.eq(
+                JPAExpressions
+                    .select(memberSub.age.max())
+                    .from(memberSub)
+            ))
+            .fetch();
+
+        assertThat(result).extracting("age").containsExactly();
+    }
+
+    /*
+     * 나이가 평균 이상인 회원 조회
+     * */
+    @Test
+    public void subQueryGoe() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Member> result = queryFactory
+            .selectFrom(member)
+            .where(member.age.goe(
+                JPAExpressions
+                    .select(memberSub.age.avg())
+                    .from(memberSub)
+            ))
+            .fetch();
+
+        assertThat(result).extracting("age").containsExactly(30, 40);
+    }
+
+    /*
+     * in 절 예제
+     * */
+    @Test
+    public void subQueryIn() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Member> result = queryFactory
+            .selectFrom(member)
+            .where(member.age.in(
+                JPAExpressions
+                    .select(memberSub.age)
+                    .from(memberSub)
+                    .where(memberSub.age.gt(10))
+            ))
+            .fetch();
+
+        assertThat(result).extracting("age").containsExactly(20, 30, 40);
+    }
+
+    /*
+     * select절 subQuery 예제
+     * */
+    @Test
+    public void selectSubQuery() {
+        QMember memberSub = new QMember("memberSub");
+
+        List<Tuple> result = queryFactory
+            .select(member.username,
+                    JPAExpressions
+                        .select(memberSub.age.avg())
+                        .from(memberSub))
+            .from(member)
+            .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+    }
+    /**
+     * From 절 서브쿼리의 한계
+     * - JPA JPQL 서브쿼리의 한계로 from 절의 서브쿼리는 지원하지 않음
+     * - 하이버네이트 구현체를 사용하면 select 절 서브쿼리는 지원함
+     * - 해결 방안
+     *      - 서브쿼리를 join으로 변경 -> 가능한 상황이 있고 불가능한 상황도 있음
+     *      - 쿼리를 2번으로 나눠서 실행
+     *      - native 쿼리 사용
+     *
+     * - 디비는 데이터를 가져오는 용도로만 사용하고 그 외 가공은 애플리케이션에서 하는게 좋다.
+     * - 한 방 쿼리가 좋은 건 아니다.
+     */
 }
