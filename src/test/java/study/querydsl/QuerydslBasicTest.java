@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 import static study.querydsl.entity.QMember.*;
+import static study.querydsl.entity.QTeam.*;
 
 // 전체 화면 날리기 command + shift + F12
 
@@ -34,6 +35,7 @@ public class QuerydslBasicTest {
 
     @BeforeEach
     public void before() {
+        System.out.println("hello~~~~");
         new JPAQueryFactory(em); // 필드로 빼도 동시성 문제 없음 -> 스프링 프레임워크에서 주입하는 em은 트랜잭션 바인딩 해줌 -> 멀티스레드 환경에서 문제없음
         Team teamA = new Team("teamA");
         Team teamB = new Team("teamB");
@@ -230,7 +232,55 @@ public class QuerydslBasicTest {
             .from(member.team, team)
             .where(member.username.eq(team.name))
             .fetch();
+    }
 
+    /**
+     * on 절을 활용한 조인(JPA 2.1부터 지원)
+     * 1. 조인 대상 필터링
+     * 2. 연관관계 없는 엔티티 외부 조인
+     *
+     * 예) 회원과 팀을 조인하면서, 팀 이름이 teamA인 팀만 조인, 회원은 모두 조회
+     * JPQL: select m, t from Member m left join m.team t on t.name = 'teamA'
+     */
+    @Test
+    public void joinOnFiltering() {
+//        List<Tuple> result = queryFactory
+//            .select(member, team)
+//            .from(member)
+//            .leftJoin(member.team, team).on(team.name.eq("teamA"))
+//            .fetch();
 
+        List<Tuple> result = queryFactory
+            .select(member, team)
+            .from(member)
+            .join(member.team, team)
+//            .on(team.name.eq("teamA))  inner join이라 On 이든 where 이든 쿼리 결과는 같다
+            .where(team.name.eq("teamA"))
+            .fetch();
+
+        for (Tuple tuple : result) {
+            System.out.println("tuple = " + tuple);
+        }
+
+    }
+
+    /**
+     * 하이버네이트 5.1 부터 `on` 을 사용해서 서로 관계가 없는 필드로 외부 조인 가능
+     */
+    @Test
+    public void joinOnWithoutRelation() {
+        em.persist(new Member("teamA"));
+        em.persist(new Member("teamB"));
+        em.persist(new Member("teamC"));
+
+        QTeam team = QTeam.team;
+
+        queryFactory
+            .select(member)
+            .from(member)
+            .leftJoin(team)
+            .on(member.username.eq(team.name))
+            .where(member.username.eq(team.name))
+            .fetch();
     }
 }
