@@ -2,6 +2,7 @@ package study.querydsl;
 
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
@@ -10,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import study.querydsl.dto.MemberDto;
+import study.querydsl.dto.QMemberDto;
 import study.querydsl.entity.Member;
 import study.querydsl.entity.QMember;
 import study.querydsl.entity.QTeam;
@@ -402,4 +405,105 @@ public class QuerydslBasicTest {
      * - 디비는 데이터를 가져오는 용도로만 사용하고 그 외 가공은 애플리케이션에서 하는게 좋다.
      * - 한 방 쿼리가 좋은 건 아니다.
      */
+
+
+    @Test
+    public void simpleProjection() {
+        List<String> result = queryFactory
+            .select(member.username)
+            .from(member)
+            .fetch();
+
+        for (String s : result) {
+            System.out.println("s = " + s);
+        }
+    }
+
+    /**
+     * Tuple은 레포지토리에서만 사용하고 Service 혹은 Controller 까지 전파가된다면 좋은 설계가 아님
+     * 왜냐하면 Service, Controller에 Tuple type이 존재하는 건 QueryDSL에 의존관계를 갖기 때문
+     * 내부에서만 Tuple을 사용하고 DTO로 반환해서 리턴하는걸 권장
+     */
+    @Test
+    public void tupleProjection() {
+        List<Tuple> result = queryFactory
+            .select(member.username, member.age)
+            .from(member)
+            .fetch();
+
+        for (Tuple tuple : result) {
+            String username = tuple.get(member.username);
+            System.out.println("username = " + username);
+        }
+    }
+
+    @Test
+    public void findDtoByJPQL() {
+        List<MemberDto> result = em.createQuery(
+            "select new study.querydsl.dto.MemberDto(m.username, m.age) " +
+                "from Member m", MemberDto.class)
+            .getResultList();
+    }
+
+    /**
+     * 기본 생성자가 필요하다.
+     */
+    @Test
+    public void findDtoBySetter() {
+        List<MemberDto> result = queryFactory
+            .select(Projections.bean(MemberDto.class,
+                member.username,
+                member.age))
+            .from(member).fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }
+    }
+
+    @Test
+    public void findDtoByField() {
+        List<MemberDto> result = queryFactory
+            .select(Projections.fields(MemberDto.class,
+                member.username,
+                member.age))
+            .from(member).fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }
+    }
+
+    /**
+     * 단점: 컴파일 오류 x, 유저가 실행할 때 런타임 오류 발생
+     */
+    @Test
+    public void findDtoByConstructor() {
+        List<MemberDto> result = queryFactory
+            .select(Projections.constructor(MemberDto.class,
+                member.username,
+                member.age))
+            .from(member).fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }
+    }
+
+    /**
+     * 컴파일 오류를 확인할 수 있음
+     * 단점: Dto는 queryDSL을 모르는 상태지만 해당 기능을 사용하면 QueryDSL에 의존성을 가지게 된다.
+     *      QueryDSL을 사용하지 않으면 영향을 받게된다.
+     */
+    @Test
+    public void findDtoByQueryProjection() {
+        List<MemberDto> result = queryFactory
+            .select(new QMemberDto(member.username, member.age))
+            .from(member)
+            .fetch();
+
+        for (MemberDto memberDto : result) {
+            System.out.println("memberDto = " + memberDto);
+        }
+    }
 }
